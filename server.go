@@ -61,9 +61,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func isSlice(payload []byte) bool {
+	return len(payload) >= 2 && payload[0] == 91 && payload[len(payload)-1] == 93
+}
+
 func (s *Server) Call(ctx context.Context, payload []byte) any {
-	// handle batch requests if starts with [ and ends with ]
-	if payload[0] == 91 && payload[len(payload)-1] == 93 {
+	if isSlice(payload) {
 		if len(payload) == 2 {
 			return &Response{
 				Version: "2.0",
@@ -169,8 +172,20 @@ func (s *Server) request(ctx context.Context, payload []byte) (resp *Response) {
 			argIndexes = append(argIndexes, k)
 		}
 	}
-
-	pv := reflect.ValueOf(req.Params)
+	var params []json.RawMessage
+	if isSlice(req.Params) {
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			resp.Error = &Error{
+				Code:    -32602,
+				Message: "Invalid params",
+				Err:     err,
+			}
+			return
+		}
+	} else if len(req.Params) > 0 {
+		params = append(params, req.Params)
+	}
+	pv := reflect.ValueOf(params)
 	if pv.Kind() != reflect.Slice || pv.Len() != len(argIndexes) {
 		resp.Error = &Error{
 			Code:    -32602,
@@ -182,7 +197,7 @@ func (s *Server) request(ctx context.Context, payload []byte) (resp *Response) {
 		for k, i := range argIndexes {
 			t := argTypes[k]
 			val := reflect.New(t)
-			if err := json.Unmarshal(req.Params[k], val.Interface()); err != nil {
+			if err := json.Unmarshal(params[k], val.Interface()); err != nil {
 				resp.Error = &Error{
 					Code:    -32602,
 					Message: "Invalid params",

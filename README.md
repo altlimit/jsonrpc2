@@ -20,7 +20,6 @@ go get github.com/altlimit/jsonrpc2
 Refer to cmd/example for a running example.
 
 You are allowed to have any or no parameters. Context is optional and doesn't count in your jsonrpc request.
-Request params are only available with arrays and not named parameters.
 Returning 2 values with error as last return type will automatically respond proper error response.
 Returning more than 2 values with or without errors returns an array of result.
 ```go

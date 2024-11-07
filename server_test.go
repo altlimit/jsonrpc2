@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/altlimit/jsonrpc2"
@@ -41,6 +42,13 @@ func (c *Calculator) Divide(a float64, b float64) (float64, error) {
 	return a / b, nil
 }
 
+func (c *Calculator) Add(ctx context.Context, add struct {
+	A int `json:"a"`
+	B int `json:"b"`
+}) int {
+	return add.A + add.B
+}
+
 func TestNewServer(t *testing.T) {
 	ctx := context.Background()
 	s := jsonrpc2.NewServer(&Calculator{})
@@ -67,16 +75,26 @@ func TestNewServer(t *testing.T) {
 			{"foo": "boo"},
 			{"jsonrpc": "2.0", "method": "foo.get", "params": {"name": "myself"}, "id": "5"},
 			{"jsonrpc": "2.0", "method": "GetData", "id": "9"}
-		]`: `[{"jsonrpc":"2.0","result":["hello",5],"id":"9"},{"jsonrpc":"2.0","error":{"code":-32601,"string":"Method not found"},"id":null},{"jsonrpc":"2.0","result":19,"id":"2"},{"jsonrpc":"2.0","error":{"code":-32600,"string":"Invalid Request"},"id":null},{"jsonrpc":"2.0","result":7,"id":"1"}]`,
+		]`: `[{"jsonrpc":"2.0","result":["hello",5],"id":"9"},{"jsonrpc":"2.0","error":{"code":-32601,"string":"Method not found"},"id":null},{"jsonrpc":"2.0","error":{"code":-32601,"string":"Method not found"},"id":"5"},{"jsonrpc":"2.0","result":19,"id":"2"},{"jsonrpc":"2.0","result":7,"id":"1"}]`,
 		`[
 			{"jsonrpc": "2.0", "method": "NotifyHello", "params": [1,2,4]},
 			{"jsonrpc": "2.0", "method": "Update", "params": [7]}
 		]`: `null`,
+		`{"jsonrpc": "2.0", "method": "Add", "params": {"a": 16, "b": 5}, "id": 3}`: `{"jsonrpc":"2.0","result":21,"id":3}`,
 	}
 
 	for k, v := range testCases {
 		out := str(s.Call(ctx, []byte(k)))
-		if out != v {
+		if len(out) > 0 && out[0] == '[' {
+			// order of batch not guaranteed so check for all existence
+			var outs []json.RawMessage
+			json.Unmarshal([]byte(out), &outs)
+			for _, o := range outs {
+				if !strings.Contains(v, string(o)) {
+					t.Errorf("Expected to see %s from %s", string(o), v)
+				}
+			}
+		} else if out != v {
 			t.Errorf("Expected %s got %s", v, out)
 		}
 	}

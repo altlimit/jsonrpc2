@@ -7,10 +7,10 @@ import (
 
 type (
 	Request struct {
-		Version string            `json:"jsonrpc"`
-		Method  string            `json:"method"`
-		Params  []json.RawMessage `json:"params"`
-		ID      interface{}       `json:"id"`
+		Version string          `json:"jsonrpc"`
+		Method  string          `json:"method"`
+		Params  json.RawMessage `json:"params"`
+		ID      interface{}     `json:"id"`
 	}
 
 	Response struct {
