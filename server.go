@@ -181,16 +181,16 @@ func (s *Server) request(ctx context.Context, payload []byte) (resp *Response) {
 	if len(argIndexes) > 0 {
 		for k, i := range argIndexes {
 			t := argTypes[k]
-			v := reflect.ValueOf(pv.Index(k).Interface())
-			if v.Kind() != t.Kind() {
+			val := reflect.New(t)
+			if err := json.Unmarshal(req.Params[k], val.Interface()); err != nil {
 				resp.Error = &Error{
 					Code:    -32602,
 					Message: "Invalid params",
-					Err:     fmt.Errorf("invalid param[%d] %v expected got %v", i, t.Kind(), v.Kind()),
+					Err:     fmt.Errorf("param %d must be %s (%v)", i, t, err),
 				}
 				return
 			}
-			args[i] = v
+			args[i] = val.Elem()
 		}
 	}
 	out := m.source.Call(args)
